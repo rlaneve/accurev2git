@@ -61,6 +61,13 @@ namespace AccuRev2Git
 				execGitCommit(string.Format("commit --date={0} --author={1} -m \"Initial git commit.\"", initialDate, "\"Ryan LaNeve <ryan.laneve@avispl.com>\""), workingDir, initialDate.ToString());
 				execGitRaw("checkout -b dev", workingDir, true);
 			}
+			else
+			{
+				execClean(workingDir);
+				var lastTran = xdoc.Document.Descendants("transaction").OrderByDescending(t => Int32.Parse(t.Attribute("id").Value)).Where(t => Int32.Parse(t.Attribute("id").Value) < startingTransaction).First().Attribute("id").Value;
+				execAccuRev(string.Format("chstream -s {0}_time-warp -t {1}", depotName, lastTran), workingDir);
+				execAccuRev(string.Format("pop -R -O ."), workingDir);
+			}
 			foreach (var transaction in nodes)
 // ReSharper restore PossibleNullReferenceException
 			{
@@ -82,11 +89,23 @@ namespace AccuRev2Git
 			var comment = (commentNode == null ? string.Empty : commentNode.Value);
 			comment = string.IsNullOrEmpty(comment) ? "[no original comment]" : comment;
 			comment += string.Format("{0}{0}[AccuRev Transaction #{1}]", Environment.NewLine, transactionId);
-			var commentFile = string.Format(".\\_{0}_Comment_{1}.txt", depotName, transactionId);
+			var commentFile = string.Format(".\\_{0}_Comment.txt", depotName, transactionId);
 			var commentFilePath = Path.GetFullPath(commentFile);
 			File.WriteAllText(commentFile, comment);
-			execClean(workingDir);
-			execAccuRev(string.Format("pop -R -O -v {0}_dev -L . -t {1} .", depotName, transactionId), workingDir);
+			//execClean(workingDir);
+			//execAccuRev(string.Format("pop -R -O -v {0}_dev -L . -t {1} .", depotName, transactionId), workingDir);
+			execAccuRev(string.Format("chstream -s {0}_time-warp -t {1}", depotName, transactionId), workingDir);
+			try
+			{
+				execAccuRev(string.Format("update"), workingDir);
+			}
+			catch(Exception)
+			{
+				execAccuRev("chws -w \"CRM_Ryan\" -l c:\\temp", workingDir);
+				execClean(workingDir);
+				execAccuRev(string.Format("pop -R -O -v {0}_dev -L . -t {1} .", depotName, transactionId), workingDir);
+				execAccuRev("chws -w \"CRM_Ryan\" -l .", workingDir);
+			}
 			execGitRaw("add --all", workingDir);
 			execGitCommit(string.Format("commit --date={0} --author={1} --file={2}", unixDate, gitUser, commentFilePath), workingDir, unixDate.ToString());
 		}
@@ -107,8 +126,8 @@ namespace AccuRev2Git
 					return "\"Josh Schwartzberg <josh.schwartzberg@avispl.com>\"";
 				case "Kevin":
 					return "\"Kevin Rood <kevin.rood@avispl.com>\"";
-				case "Erik":
-					return "\"Erik Dahling <erik.dahling@avispl.com>\"";
+				case "Erick":
+					return "\"Erick Dahling <erick.dahling@avispl.com>\"";
 				case "Wayne":
 					return "\"Wayne Molena <wayne.molena@avispl.com>\"";
 			}
@@ -150,7 +169,10 @@ namespace AccuRev2Git
 			{
 				var errors = process.StandardError.ReadToEnd();
 				if (!errors.Contains("is defunct") && !errors.Contains("No element named") && !errors.Contains("Unable to proceed with annotate.") && !errors.Contains("Specified version not found for:"))
+				{
+					Debug.WriteLine(errors);
 					throw new ApplicationException(string.Format("AccuRev has returned an error: {0}", errors));
+				}
 			}
 			return result;
 		}
