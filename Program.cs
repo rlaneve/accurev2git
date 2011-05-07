@@ -70,14 +70,14 @@ namespace AccuRev2Git
 			var nCount = nodes.Count();
 			if (startingTransaction == 0)
 			{
-				var initialDate = long.Parse(nodes.First().Attribute("time").Value) - 60;
-				var defaultGitUserName = ConfigurationManager.AppSettings.Get("DefaultGitUserName");
-				var defaultGitUser = _gitUsers.SingleOrDefault(u => u.Name.Equals(defaultGitUserName, StringComparison.OrdinalIgnoreCase));
-				if (defaultGitUser == null)
-					throw new ApplicationException("Cannot initialize new repository without a DefaultGitUserName specified!");
+				//var initialDate = long.Parse(nodes.First().Attribute("time").Value) - 60;
+				//var defaultGitUserName = ConfigurationManager.AppSettings.Get("DefaultGitUserName");
+				//var defaultGitUser = _gitUsers.SingleOrDefault(u => u.Name.Equals(defaultGitUserName, StringComparison.OrdinalIgnoreCase));
+				//if (defaultGitUser == null)
+				//     throw new ApplicationException("Cannot initialize new repository without a DefaultGitUserName specified!");
 				execGitRaw("init", workingDir);
-				execGitRaw("add --all", workingDir);
-				execGitCommit(string.Format("commit --date={0} --author={1} -m \"Initial git commit.\"", initialDate, defaultGitUser), workingDir, initialDate.ToString(), defaultGitUser);
+				//execGitRaw("add --all", workingDir);
+				//execGitCommit(string.Format("commit --date={0} --author={1} -m \"Initial git commit.\"", initialDate, defaultGitUser), workingDir, initialDate.ToString(), defaultGitUser);
 				execGitRaw("checkout -b dev", workingDir, true);
 			}
 			foreach (var transaction in nodes)
@@ -192,7 +192,7 @@ namespace AccuRev2Git
 			process.StartInfo.RedirectStandardError = true;
 			process.StartInfo.RedirectStandardOutput = true;
 			process.Start();
-			process.StandardOutput.ReadToEnd();
+			var output = process.StandardOutput.ReadToEnd();
 			if (process.StandardError.EndOfStream == false)
 			{
 				var errors = process.StandardError.ReadToEnd();
