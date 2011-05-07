@@ -1,4 +1,5 @@
-﻿Ryan|Ryan LaNeve|ryan.laneve@avispl.com
+﻿#Format is AccuRevUserName|GitUserName|GitEmailAddress
+Ryan|Ryan LaNeve|ryan.laneve@avispl.com
 George|George Cox|george.cox@avispl.com
 Joey|Joey Shipley|joe.shipley@avispl.com
 Jeremy|Jeremy Schwartzberg|jeremy.schwartzberg@avispl.com

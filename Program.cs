@@ -36,7 +36,7 @@ namespace AccuRev2Git
 
 			var usersRaw = File.ReadAllLines("users.txt");
 			_gitUsers = new List<GitUser>(usersRaw.Length);
-			foreach (var parts in usersRaw.Where(userRaw => !string.IsNullOrEmpty(userRaw)).Select(userRaw => userRaw.Split('|')))
+			foreach (var parts in usersRaw.Where(userRaw => !string.IsNullOrEmpty(userRaw) && !userRaw.StartsWith("#")).Select(userRaw => userRaw.Split('|')))
 				_gitUsers.Add(new GitUser(parts[0], parts[1], parts[2]));
 		}
 
