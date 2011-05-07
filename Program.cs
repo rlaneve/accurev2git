@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
 using System.IO;
@@ -9,6 +10,8 @@ namespace AccuRev2Git
 {
 	class Program
 	{
+		private static List<GitUser> _gitUsers;
+
 		public static void Main(string[] args)
 		{
 			if (args.Length == 0)
@@ -22,7 +25,19 @@ namespace AccuRev2Git
 			if (string.IsNullOrEmpty(workingDir))
 				throw new ApplicationException(string.Format("No value specified for working directory."));
 
+			loadUsers();
 			loadDepotFromScratch(depotName, workingDir, startingTran);
+		}
+
+		private static void loadUsers()
+		{
+			if (!File.Exists("users.txt"))
+				throw new ApplicationException("No \"users.txt\" file found!");
+
+			var usersRaw = File.ReadAllLines("users.txt");
+			_gitUsers = new List<GitUser>(usersRaw.Length);
+			foreach (var parts in usersRaw.Where(userRaw => !string.IsNullOrEmpty(userRaw)).Select(userRaw => userRaw.Split('|')))
+				_gitUsers.Add(new GitUser(parts[0], parts[1], parts[2]));
 		}
 
 		static void loadDepotFromScratch(string depotName, string workingDir, int startingTransaction)
@@ -56,88 +71,49 @@ namespace AccuRev2Git
 			if (startingTransaction == 0)
 			{
 				var initialDate = long.Parse(nodes.First().Attribute("time").Value) - 60;
+				var defaultGitUserName = ConfigurationManager.AppSettings.Get("DefaultGitUserName");
+				var defaultGitUser = _gitUsers.SingleOrDefault(u => u.Name.Equals(defaultGitUserName, StringComparison.OrdinalIgnoreCase));
+				if (defaultGitUser == null)
+					throw new ApplicationException("Cannot initialize new repository without a DefaultGitUserName specified!");
 				execGitRaw("init", workingDir);
 				execGitRaw("add --all", workingDir);
-				execGitCommit(string.Format("commit --date={0} --author={1} -m \"Initial git commit.\"", initialDate, "\"Ryan LaNeve <ryan.laneve@avispl.com>\""), workingDir, initialDate.ToString());
+				execGitCommit(string.Format("commit --date={0} --author={1} -m \"Initial git commit.\"", initialDate, defaultGitUser), workingDir, initialDate.ToString(), defaultGitUser);
 				execGitRaw("checkout -b dev", workingDir, true);
 			}
-			else
-			{
-				execClean(workingDir);
-				var lastTran = xdoc.Document.Descendants("transaction").OrderByDescending(t => Int32.Parse(t.Attribute("id").Value)).Where(t => Int32.Parse(t.Attribute("id").Value) < startingTransaction).First().Attribute("id").Value;
-				execAccuRev(string.Format("chstream -s {0}_time-warp -t {1}", depotName, lastTran), workingDir);
-				execAccuRev(string.Format("pop -R -O ."), workingDir);
-			}
 			foreach (var transaction in nodes)
-// ReSharper restore PossibleNullReferenceException
 			{
 				n++;
 				var transactionId = Convert.ToInt32(transaction.Attribute("id").Value);
 				Console.Write("Loading transaction {0} of {1} [id={2}]\x0D", n.ToString("00000"), nCount, transactionId.ToString("00000"));
 				loadTransaction(depotName, transactionId, workingDir, transaction);
 			}
+// ReSharper restore PossibleNullReferenceException
 			Console.WriteLine();
 		}
 
 		static void loadTransaction(string depotName, int transactionId, string workingDir, XElement transaction)
 		{
+// ReSharper disable PossibleNullReferenceException
 			var accurevUser = transaction.Attribute("user").Value;
 			var gitUser = translateUser(accurevUser);
 			var unixDate = long.Parse(transaction.Attribute("time").Value);
-			var datetime = convertDateTime(unixDate);
+// ReSharper restore PossibleNullReferenceException
 			var commentNode = transaction.Descendants("comment").FirstOrDefault();
 			var comment = (commentNode == null ? string.Empty : commentNode.Value);
 			comment = string.IsNullOrEmpty(comment) ? "[no original comment]" : comment;
 			comment += string.Format("{0}{0}[AccuRev Transaction #{1}]", Environment.NewLine, transactionId);
-			var commentFile = string.Format(".\\_{0}_Comment.txt", depotName, transactionId);
+			var commentFile = string.Format(".\\_{0}_Comment.txt", depotName);
 			var commentFilePath = Path.GetFullPath(commentFile);
 			File.WriteAllText(commentFile, comment);
-			//execClean(workingDir);
-			//execAccuRev(string.Format("pop -R -O -v {0}_dev -L . -t {1} .", depotName, transactionId), workingDir);
-			execAccuRev(string.Format("chstream -s {0}_time-warp -t {1}", depotName, transactionId), workingDir);
-			try
-			{
-				execAccuRev(string.Format("update"), workingDir);
-			}
-			catch(Exception)
-			{
-				execAccuRev("chws -w \"CRM_Ryan\" -l c:\\temp", workingDir);
-				execClean(workingDir);
-				execAccuRev(string.Format("pop -R -O -v {0}_dev -L . -t {1} .", depotName, transactionId), workingDir);
-				execAccuRev("chws -w \"CRM_Ryan\" -l .", workingDir);
-			}
+			execClean(workingDir);
+			execAccuRev(string.Format("pop -R -O -v {0}_dev -L . -t {1} .", depotName, transactionId), workingDir);
 			execGitRaw("add --all", workingDir);
-			execGitCommit(string.Format("commit --date={0} --author={1} --file={2}", unixDate, gitUser, commentFilePath), workingDir, unixDate.ToString());
+			execGitCommit(string.Format("commit --date={0} --author={1} --file={2}", unixDate, gitUser, commentFilePath), workingDir, unixDate.ToString(), gitUser);
 		}
 
-		static string translateUser(string accurevUser)
+		static GitUser translateUser(string accurevUser)
 		{
-			switch(accurevUser)
-			{
-				case "Ryan":
-					return "\"Ryan LaNeve <ryan.laneve@avispl.com>\"";
-				case "George":
-					return "\"George Cox <george.cox@avispl.com>\"";
-				case "Joey":
-					return "\"Joey Shipley <joey.shipley@avispl.com>\"";
-				case "Jeremy":
-					return "\"Jeremy Schwartzberg <jeremy.schwartzberg@avispl.com>\"";
-				case "Josh":
-					return "\"Josh Schwartzberg <josh.schwartzberg@avispl.com>\"";
-				case "Kevin":
-					return "\"Kevin Rood <kevin.rood@avispl.com>\"";
-				case "Erick":
-					return "\"Erick Dahling <erick.dahling@avispl.com>\"";
-				case "Wayne":
-					return "\"Wayne Molena <wayne.molena@avispl.com>\"";
-			}
-			return accurevUser;
-		}
-
-		static DateTime _baseDateTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-		static DateTime convertDateTime(long accuRevDateTime)
-		{
-			return _baseDateTime.AddSeconds(accuRevDateTime).ToLocalTime();
+			return _gitUsers.SingleOrDefault(u => u.AccuRevUserName.Equals(accurevUser, StringComparison.OrdinalIgnoreCase));
 		}
 
 		static void execClean(string workingDir)
@@ -177,12 +153,7 @@ namespace AccuRev2Git
 			return result;
 		}
 
-		private static void execGitRaw(string arguments, string workingDir)
-		{
-			execGitRaw(arguments, workingDir, false);
-		}
-
-		static void execGitRaw(string arguments, string workingDir, bool ignoreErrors)
+		static void execGitRaw(string arguments, string workingDir, bool ignoreErrors = false)
 		{
 			var gitPath = ConfigurationManager.AppSettings["GitPath"];
 			var process = new Process
@@ -204,7 +175,7 @@ namespace AccuRev2Git
 			}
 		}
 
-		static void execGitCommit(string arguments, string workingDir, string commitDate)
+		static void execGitCommit(string arguments, string workingDir, string commitDate, GitUser gitUser)
 		{
 			var gitPath = ConfigurationManager.AppSettings["GitPath"];
 			var process = new Process
@@ -214,6 +185,8 @@ namespace AccuRev2Git
 			if (!string.IsNullOrEmpty(workingDir))
 				process.StartInfo.WorkingDirectory = workingDir;
 			process.StartInfo.EnvironmentVariables.Add("GIT_COMMITTER_DATE", commitDate);
+			process.StartInfo.EnvironmentVariables.Add("GIT_COMMITTER_NAME", gitUser.Name);
+			process.StartInfo.EnvironmentVariables.Add("GIT_COMMITTER_EMAIL", gitUser.Email);
 			process.StartInfo.UseShellExecute = false;
 			process.StartInfo.CreateNoWindow = true;
 			process.StartInfo.RedirectStandardError = true;
@@ -224,6 +197,25 @@ namespace AccuRev2Git
 			{
 				var errors = process.StandardError.ReadToEnd();
 				throw new ApplicationException(string.Format("Git has returned an error: {0}", errors));
+			}
+		}
+
+		internal class GitUser
+		{
+			public string Name { get; set; }
+			public string Email { get; set; }
+			public string AccuRevUserName { get; set; }
+
+			public GitUser(string accuRevUserName, string name, string email)
+			{
+				Name = name;
+				Email = email;
+				AccuRevUserName = accuRevUserName;
+			}
+
+			public override string ToString()
+			{
+				return string.Format("\"{0} <{1}>\"", Name, Email);
 			}
 		}
 	}
