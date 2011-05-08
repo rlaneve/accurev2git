@@ -98,10 +98,17 @@ namespace AccuRev2Git
 			var gitUser = translateUser(accurevUser);
 			var unixDate = long.Parse(transaction.Attribute("time").Value);
 // ReSharper restore PossibleNullReferenceException
+			var issueNumNodes = transaction.Descendants("version").Descendants("issueNum");
+			var issueNums = (issueNumNodes == null || issueNumNodes.Count() == 0 ? string.Empty : issueNumNodes.Select(n => n.Value).Distinct().Aggregate(string.Empty, (seed, num) => seed + ", " + num).Substring(2));
 			var commentNode = transaction.Descendants("comment").FirstOrDefault();
 			var comment = (commentNode == null ? string.Empty : commentNode.Value);
 			comment = string.IsNullOrEmpty(comment) ? "[no original comment]" : comment;
+			var commentLines = comment.Split(new[] { "\n" }, 2, StringSplitOptions.None);
+			if (commentLines.Length > 1)
+				comment = commentLines[0] + Environment.NewLine + Environment.NewLine + commentLines[1];
 			comment += string.Format("{0}{0}[AccuRev Transaction #{1}]", Environment.NewLine, transactionId);
+			if (!string.IsNullOrEmpty(issueNums))
+				comment += string.Format("{0}[Issue #s: {1}]", Environment.NewLine, issueNums);
 			var commentFile = string.Format(".\\_{0}_Comment.txt", depotName);
 			var commentFilePath = Path.GetFullPath(commentFile);
 			File.WriteAllText(commentFile, comment);
