@@ -73,15 +73,16 @@ namespace AccuRev2Git
 			var nCount = nodes.Count();
 			if (startingTransaction == 0)
 			{
-				//var initialDate = long.Parse(nodes.First().Attribute("time").Value) - 60;
-				//var defaultGitUserName = ConfigurationManager.AppSettings.Get("DefaultGitUserName");
-				//var defaultGitUser = _gitUsers.SingleOrDefault(u => u.Name.Equals(defaultGitUserName, StringComparison.OrdinalIgnoreCase));
-				//if (defaultGitUser == null)
-				//     throw new ApplicationException("Cannot initialize new repository without a DefaultGitUserName specified!");
+				var initialDate = long.Parse(nodes.First().Attribute("time").Value) - 60;
+				var defaultGitUserName = ConfigurationManager.AppSettings.Get("DefaultGitUserName");
+				var defaultGitUser = _gitUsers.SingleOrDefault(u => u.Name.Equals(defaultGitUserName, StringComparison.OrdinalIgnoreCase));
+				if (defaultGitUser == null)
+				     throw new ApplicationException("Cannot initialize new repository without a DefaultGitUserName specified!");
 				execGitRaw("init", workingDir);
-				//execGitRaw("add --all", workingDir);
-				//execGitCommit(string.Format("commit --date={0} --author={1} -m \"Initial git commit.\"", initialDate, defaultGitUser), workingDir, initialDate.ToString(), defaultGitUser);
-				execGitRaw(string.Format("checkout -b {0}", streamName), workingDir, true);
+				File.WriteAllText(Path.Combine(workingDir, ".gitignore"), "#empty");
+				execGitRaw("add --all", workingDir);
+				execGitCommit(string.Format("commit --date={0} --author={1} -m \"Initial git commit.\"", initialDate, defaultGitUser), workingDir, initialDate.ToString(), defaultGitUser);
+				execGitRaw(string.Format("checkout -b \"{0}\"", streamName), workingDir, true);
 			}
 			foreach (var transaction in nodes)
 			{
