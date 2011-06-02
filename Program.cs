@@ -14,19 +14,22 @@ namespace AccuRev2Git
 
 		public static void Main(string[] args)
 		{
-			if (args.Length == 0)
+			if (args.Length == 0 || args.Length < 3)
 			{
-				throw new ApplicationException("You must specify some arguments - this app isn't a mind reader!");
+				Console.WriteLine("You must specify some arguments - this app isn't a mind reader!");
+				Console.WriteLine("Try: depot_name stream_name working_dir [starting_accurev_trans_#]");
+				return;
 			}
 
 			var depotName = args[0];
-			var workingDir = args[1];
-			var startingTran = (args.Length > 2 ? Int32.Parse(args[2]) : 0);
+			var streamName = args[1];
+			var workingDir = args[2];
+			var startingTran = (args.Length > 3 ? Int32.Parse(args[3]) : 0);
 			if (string.IsNullOrEmpty(workingDir))
 				throw new ApplicationException(string.Format("No value specified for working directory."));
 
 			loadUsers();
-			loadDepotFromScratch(depotName, workingDir, startingTran);
+			loadDepotFromScratch(depotName, streamName, workingDir, startingTran);
 		}
 
 		private static void loadUsers()
@@ -40,11 +43,11 @@ namespace AccuRev2Git
 				_gitUsers.Add(new GitUser(parts[0], parts[1], parts[2]));
 		}
 
-		static void loadDepotFromScratch(string depotName, string workingDir, int startingTransaction)
+		static void loadDepotFromScratch(string depotName, string streamName, string workingDir, int startingTransaction)
 		{
 			var xdoc = new XDocument();
 
-			var tempFile = string.Format("_{0}_.depot.hist.xml", depotName);
+			var tempFile = string.Format("_{0}_{1}_.depot.hist.xml", depotName, streamName);
 			if (File.Exists(tempFile))
 			{
 				Console.Write("Existing history file found. Re-use it? [y|n] ");
@@ -58,8 +61,8 @@ namespace AccuRev2Git
 
 			if (xdoc.Document == null || xdoc.Nodes().Any() == false)
 			{
-				Console.WriteLine(string.Format("Retrieving complete history of {0} depot from AccuRev server...", depotName));
-				var temp = execAccuRev(string.Format("hist -p {0} -s {0}_dev -k promote -fx", depotName), workingDir);
+				Console.WriteLine(string.Format("Retrieving complete history of {0} depot, {1} stream, from AccuRev server...", depotName, streamName));
+				var temp = execAccuRev(string.Format("hist -p {0} -s {0}_{1} -k promote -fx", depotName, streamName), workingDir);
 				File.WriteAllText(tempFile, temp);
 				xdoc = XDocument.Parse(temp);
 			}
@@ -78,20 +81,20 @@ namespace AccuRev2Git
 				execGitRaw("init", workingDir);
 				//execGitRaw("add --all", workingDir);
 				//execGitCommit(string.Format("commit --date={0} --author={1} -m \"Initial git commit.\"", initialDate, defaultGitUser), workingDir, initialDate.ToString(), defaultGitUser);
-				execGitRaw("checkout -b dev", workingDir, true);
+				execGitRaw(string.Format("checkout -b {0}", streamName), workingDir, true);
 			}
 			foreach (var transaction in nodes)
 			{
 				n++;
 				var transactionId = Convert.ToInt32(transaction.Attribute("id").Value);
 				Console.Write("Loading transaction {0} of {1} [id={2}]\x0D", n.ToString("00000"), nCount, transactionId.ToString("00000"));
-				loadTransaction(depotName, transactionId, workingDir, transaction);
+				loadTransaction(depotName, streamName, transactionId, workingDir, transaction);
 			}
 // ReSharper restore PossibleNullReferenceException
 			Console.WriteLine();
 		}
 
-		static void loadTransaction(string depotName, int transactionId, string workingDir, XElement transaction)
+		static void loadTransaction(string depotName, string streamName, int transactionId, string workingDir, XElement transaction)
 		{
 // ReSharper disable PossibleNullReferenceException
 			var accurevUser = transaction.Attribute("user").Value;
@@ -113,7 +116,7 @@ namespace AccuRev2Git
 			var commentFilePath = Path.GetFullPath(commentFile);
 			File.WriteAllText(commentFile, comment);
 			execClean(workingDir);
-			execAccuRev(string.Format("pop -R -O -v {0}_dev -L . -t {1} .", depotName, transactionId), workingDir);
+			execAccuRev(string.Format("pop -R -O -v {0}_{1} -L . -t {2} .", depotName, streamName, transactionId), workingDir);
 			execGitRaw("add --all", workingDir);
 			execGitCommit(string.Format("commit --date={0} --author={1} --file={2}", unixDate, gitUser, commentFilePath), workingDir, unixDate.ToString(), gitUser);
 		}
@@ -134,6 +137,7 @@ namespace AccuRev2Git
 		static string execAccuRev(string arguments, string workingDir)
 		{
 			var accuRevPath = ConfigurationManager.AppSettings["AccuRevPath"];
+			var accuRevPrincipal = ConfigurationManager.AppSettings["AccuRevPrincipal"];
 			var process = new Process
 			{
 				StartInfo = new ProcessStartInfo(accuRevPath, arguments)
@@ -145,7 +149,7 @@ namespace AccuRev2Git
 			process.StartInfo.RedirectStandardError = true;
 			process.StartInfo.RedirectStandardOutput = true;
 			if (!process.StartInfo.EnvironmentVariables.ContainsKey("ACCUREV_PRINCIPAL"))
-				process.StartInfo.EnvironmentVariables.Add("ACCUREV_PRINCIPAL", "Ryan");
+				process.StartInfo.EnvironmentVariables.Add("ACCUREV_PRINCIPAL", accuRevPrincipal);
 			process.Start();
 			var result = process.StandardOutput.ReadToEnd();
 			if (process.StandardError.EndOfStream == false)
