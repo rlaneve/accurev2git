@@ -62,7 +62,7 @@ namespace AccuRev2Git
 			if (xdoc.Document == null || xdoc.Nodes().Any() == false)
 			{
 				Console.WriteLine(string.Format("Retrieving complete history of {0} depot, {1} stream, from AccuRev server...", depotName, streamName));
-				var temp = execAccuRev(string.Format("hist -p {0} -s {0}_{1} -k promote -fx", depotName, streamName), workingDir);
+				var temp = execAccuRev(string.Format("hist -p \"{0}\" -s \"{0}_{1}\" -k promote -fx", depotName, streamName), workingDir);
 				File.WriteAllText(tempFile, temp);
 				xdoc = XDocument.Parse(temp);
 			}
@@ -117,9 +117,9 @@ namespace AccuRev2Git
 			var commentFilePath = Path.GetFullPath(commentFile);
 			File.WriteAllText(commentFile, comment);
 			execClean(workingDir);
-			execAccuRev(string.Format("pop -R -O -v {0}_{1} -L . -t {2} .", depotName, streamName, transactionId), workingDir);
+			execAccuRev(string.Format("pop -R -O -v \"{0}_{1}\" -L . -t {2} .", depotName, streamName, transactionId), workingDir);
 			execGitRaw("add --all", workingDir);
-			execGitCommit(string.Format("commit --date={0} --author={1} --file={2}", unixDate, gitUser, commentFilePath), workingDir, unixDate.ToString(), gitUser);
+			execGitCommit(string.Format("commit --date={0} --author={1} --file=\"{2}\"", unixDate, gitUser, commentFilePath), workingDir, unixDate.ToString(), gitUser);
 		}
 
 		static GitUser translateUser(string accurevUser)
