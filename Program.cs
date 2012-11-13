@@ -10,6 +10,7 @@ namespace AccuRev2Git
 {
 	class Program
 	{
+		private static string _accurevUsername;
 		private static List<GitUser> _gitUsers;
 
 		public static void Main(string[] args)
@@ -29,8 +30,19 @@ namespace AccuRev2Git
 				throw new ApplicationException(string.Format("No value specified for working directory."));
 			if (streamName.Equals("{root}", StringComparison.OrdinalIgnoreCase))
 				streamName = string.Empty;
+			accurevLogin();
 			loadUsers();
 			loadDepotFromScratch(depotName, streamName, workingDir, startingTran);
+		}
+
+		private static void accurevLogin()
+		{
+			Console.WriteLine("AccuRev Login...");
+			Console.Write("Username: ");
+			_accurevUsername = Console.ReadLine();
+			Console.Write("Password: ");
+			var password = Console.ReadLine();
+			execAccuRev(string.Format("login -n {0} \"{1}\"", _accurevUsername, password), string.Empty);
 		}
 
 		private static void loadUsers()
@@ -139,7 +151,6 @@ namespace AccuRev2Git
 		static string execAccuRev(string arguments, string workingDir)
 		{
 			var accuRevPath = ConfigurationManager.AppSettings["AccuRevPath"];
-			var accuRevPrincipal = ConfigurationManager.AppSettings["AccuRevPrincipal"];
 			var process = new Process
 			{
 				StartInfo = new ProcessStartInfo(accuRevPath, arguments)
@@ -151,7 +162,7 @@ namespace AccuRev2Git
 			process.StartInfo.RedirectStandardError = true;
 			process.StartInfo.RedirectStandardOutput = true;
 			if (!process.StartInfo.EnvironmentVariables.ContainsKey("ACCUREV_PRINCIPAL"))
-				process.StartInfo.EnvironmentVariables.Add("ACCUREV_PRINCIPAL", accuRevPrincipal);
+				process.StartInfo.EnvironmentVariables.Add("ACCUREV_PRINCIPAL", _accurevUsername);
 			process.Start();
 			var result = process.StandardOutput.ReadToEnd();
 			if (process.StandardError.EndOfStream == false)
