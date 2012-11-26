@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+using CommandLine.Text;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
@@ -8,19 +7,12 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("AccuRev2Git")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Microsoft")]
+[assembly: AssemblyCompany("Ryan LaNeve")]
 [assembly: AssemblyProduct("AccuRev2Git")]
-[assembly: AssemblyCopyright("Copyright © Microsoft 2011")]
+[assembly: AssemblyCopyright("Copyright © Ryan LaNeve 2011-2012")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
-// Setting ComVisible to false makes the types in this assembly not visible 
-// to COM components.  If you need to access a type in this assembly from 
-// COM, set the ComVisible attribute to true on that type.
-[assembly: ComVisible(false)]
-
-// The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("21028fc3-f629-4011-8d3b-969400d425ea")]
 
 // Version information for an assembly consists of the following four values:
 //
@@ -34,3 +26,8 @@ using System.Runtime.InteropServices;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyInformationalVersionAttribute("1.0")]
+
+// from CommandLineParser.Text
+[assembly: AssemblyUsage(
+  "Usage: accurev2git -d=SomeDepot -s=SomeDepot_Stream -w=.")]

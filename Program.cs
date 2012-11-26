@@ -5,31 +5,45 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
+using CommandLine;
+using CommandLine.Text;
 
 namespace AccuRev2Git
 {
+	class Options
+	{
+		[Option("d", "depot", HelpText = "Name of the AccuRev depot.", Required = true)]
+		public string DepotName { get; set; }
+
+		[Option("s", "stream", HelpText = "Name of the AccuRev stream.", DefaultValue = "")]
+		public string StreamName { get; set; }
+
+		[Option("w", "workingDir", HelpText = "Working directory of [new] git repo.", Required = true)]
+		public string WorkingDir { get; set; }
+
+		[Option("t", "startingTran", HelpText = "AccuRev transaction to start from.", DefaultValue = 0)]
+		public int StartingTransaction { get; set; }
+	}
+
 	class Program
 	{
+		private static Options _options = new Options();
 		private static string _accurevUsername;
 		private static List<GitUser> _gitUsers;
 
 		public static void Main(string[] args)
 		{
-			if (args.Length == 0 || args.Length < 3)
+			if (args == null || !CommandLineParser.Default.ParseArguments(args, _options))
 			{
-				Console.WriteLine("You must specify some arguments - this app isn't a mind reader!");
-				Console.WriteLine("Try: depot_name stream_name working_dir [starting_accurev_trans_#]");
+				Console.WriteLine(HelpText.AutoBuild(_options));
 				return;
 			}
 
-			var depotName = args[0];
-			var streamName = args[1];
-			var workingDir = args[2];
-			var startingTran = (args.Length > 3 ? Int32.Parse(args[3]) : 0);
-			if (string.IsNullOrEmpty(workingDir))
-				throw new ApplicationException(string.Format("No value specified for working directory."));
-			if (streamName.Equals("{root}", StringComparison.OrdinalIgnoreCase))
-				streamName = string.Empty;
+			var depotName = _options.DepotName;
+			var streamName = _options.StreamName;
+			var workingDir = _options.WorkingDir;
+			var startingTran = _options.StartingTransaction;
+
 			accurevLogin();
 			loadUsers();
 			loadDepotFromScratch(depotName, streamName, workingDir, startingTran);
@@ -90,7 +104,7 @@ namespace AccuRev2Git
 				var defaultGitUserName = ConfigurationManager.AppSettings.Get("DefaultGitUserName");
 				var defaultGitUser = _gitUsers.SingleOrDefault(u => u.Name.Equals(defaultGitUserName, StringComparison.OrdinalIgnoreCase));
 				if (defaultGitUser == null)
-				     throw new ApplicationException("Cannot initialize new repository without a DefaultGitUserName specified!");
+					 throw new ApplicationException("Cannot initialize new repository without a DefaultGitUserName specified!");
 				execGitRaw("init", workingDir);
 				File.WriteAllText(Path.Combine(workingDir, ".gitignore"), "#empty");
 				execGitRaw("add --all", workingDir);
