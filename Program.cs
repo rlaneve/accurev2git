@@ -26,6 +26,12 @@ namespace AccuRev2Git
 
 		[Option("r", "resume", HelpText = "Resume from last transaction completed.", DefaultValue = false)]
 		public bool Resume { get; set; }
+
+		[Option("u", "username", HelpText = "AccuRev username.", DefaultValue = null)]
+		public string AccuRevUserName { get; set; }
+
+		[Option("p", "password", HelpText = "AccuRev password.", DefaultValue = null)]
+		public string AccuRevPassword { get; set; }
 	}
 
 	class Program
@@ -48,18 +54,26 @@ namespace AccuRev2Git
 			var startingTran = _options.StartingTransaction;
 			var resume = _options.Resume;
 
-			accurevLogin();
+			accurevLogin(_options);
 			loadUsers();
 			loadDepotFromScratch(depotName, streamName, workingDir, startingTran, resume);
 		}
 
-		private static void accurevLogin()
+		private static void accurevLogin(Options options)
 		{
 			Console.WriteLine("AccuRev Login...");
-			Console.Write("Username: ");
-			_accurevUsername = Console.ReadLine();
-			Console.Write("Password: ");
-			var password = Console.ReadLine();
+			_accurevUsername = options.AccuRevUserName;
+			if (string.IsNullOrEmpty(_accurevUsername))
+			{
+				Console.Write("Username: ");
+				_accurevUsername = Console.ReadLine();
+			}
+			var password = options.AccuRevPassword;
+			if (string.IsNullOrEmpty(password))
+			{
+				Console.Write("Password: ");
+				password = Console.ReadLine();
+			}
 			execAccuRev(string.Format("login -n {0} \"{1}\"", _accurevUsername, password), string.Empty);
 		}
 
