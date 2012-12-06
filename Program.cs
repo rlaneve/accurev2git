@@ -21,8 +21,11 @@ namespace AccuRev2Git
 		[Option("w", "workingDir", HelpText = "Working directory of [new] git repo.", Required = true)]
 		public string WorkingDir { get; set; }
 
-		[Option("t", "startingTran", HelpText = "AccuRev transaction to start from.", DefaultValue = 0)]
-		public int StartingTransaction { get; set; }
+		[Option("t", "startingTran", HelpText = "AccuRev transaction to start from.", DefaultValue = null)]
+		public int? StartingTransaction { get; set; }
+
+		[Option("r", "resume", HelpText = "Resume from last transaction completed.", DefaultValue = false)]
+		public bool Resume { get; set; }
 	}
 
 	class Program
@@ -43,10 +46,11 @@ namespace AccuRev2Git
 			var streamName = _options.StreamName;
 			var workingDir = _options.WorkingDir;
 			var startingTran = _options.StartingTransaction;
+			var resume = _options.Resume;
 
 			accurevLogin();
 			loadUsers();
-			loadDepotFromScratch(depotName, streamName, workingDir, startingTran);
+			loadDepotFromScratch(depotName, streamName, workingDir, startingTran, resume);
 		}
 
 		private static void accurevLogin()
@@ -70,19 +74,26 @@ namespace AccuRev2Git
 				_gitUsers.Add(new GitUser(parts[0], parts[1], parts[2]));
 		}
 
-		static void loadDepotFromScratch(string depotName, string streamName, string workingDir, int startingTransaction)
+		static void loadDepotFromScratch(string depotName, string streamName, string workingDir, int? startingTransaction, bool resume)
 		{
 			var xdoc = new XDocument();
 
 			var tempFile = string.Format("_{0}_{1}_.depot.hist.xml", depotName, streamName);
 			if (File.Exists(tempFile))
 			{
-				Console.Write("Existing history file found. Re-use it? [y|n] ");
-// ReSharper disable PossibleNullReferenceException
-				if (Console.ReadLine().ToUpper() == "Y")
-// ReSharper restore PossibleNullReferenceException
+				if (resume)
 				{
 					xdoc = XDocument.Load(tempFile);
+				}
+				else
+				{
+					Console.Write("Existing history file found. Re-use it? [y|n] ");
+// ReSharper disable PossibleNullReferenceException
+					if (Console.ReadLine().ToUpper() == "Y")
+// ReSharper restore PossibleNullReferenceException
+					{
+						xdoc = XDocument.Load(tempFile);
+					}
 				}
 			}
 
@@ -97,6 +108,35 @@ namespace AccuRev2Git
 			var n = 0;
 // ReSharper disable PossibleNullReferenceException
 			var nodes = xdoc.Document.Descendants("transaction").Where(t => Int32.Parse(t.Attribute("id").Value) >= startingTransaction).OrderBy(t => Int32.Parse(t.Attribute("id").Value));
+			if (resume)
+			{
+				Console.WriteLine("Attempting to resume from last completed transaction.");
+				int lastTransaction;
+				var result = execGitRaw("config --get accurev2git.lasttran", workingDir);
+				if (!Int32.TryParse(result, out lastTransaction))
+					throw new ApplicationException("Cannot resume - no last transaction was found in git config key 'accurev2git.lasttran'.");
+
+				Console.WriteLine("Resuming from last completed transaction {0}.", lastTransaction);
+				Console.WriteLine("Retrieving history as of {0} for {1} depot, {2} stream, from AccuRev server...", lastTransaction, depotName, streamName);
+				var temp = execAccuRev(string.Format("hist -p \"{0}\" -s \"{0}{1}\" -k promote -t {2}-now -fx", depotName, (string.IsNullOrEmpty(streamName) ? "" : "_" + streamName), lastTransaction), workingDir);
+				File.WriteAllText(tempFile, temp);
+				xdoc = XDocument.Parse(temp);
+
+				nodes = xdoc.Document.Descendants("transaction").Where(t => Int32.Parse(t.Attribute("id").Value) > lastTransaction).OrderBy(t => Int32.Parse(t.Attribute("id").Value));
+				try
+				{
+					startingTransaction = nodes.Select(t => Int32.Parse(t.Attribute("id").Value)).First();
+				}
+				catch (Exception)
+				{
+					Console.WriteLine("No transactions found after last transaction of {0}.", lastTransaction);
+					return;
+				}
+			}
+			else
+			{
+				startingTransaction = startingTransaction ?? 0;
+			}
 			var nCount = nodes.Count();
 			if (startingTransaction == 0)
 			{
@@ -105,6 +145,8 @@ namespace AccuRev2Git
 				var defaultGitUser = _gitUsers.SingleOrDefault(u => u.Name.Equals(defaultGitUserName, StringComparison.OrdinalIgnoreCase));
 				if (defaultGitUser == null)
 					 throw new ApplicationException("Cannot initialize new repository without a DefaultGitUserName specified!");
+				if (Directory.Exists(Path.Combine(workingDir, ".git")))
+					throw new ApplicationException(string.Format("Cannot initialize new repository; repository already exists in '{0}'.", workingDir));
 				execGitRaw("init", workingDir);
 				File.WriteAllText(Path.Combine(workingDir, ".gitignore"), "#empty");
 				execGitRaw("add --all", workingDir);
@@ -147,6 +189,7 @@ namespace AccuRev2Git
 			execAccuRev(string.Format("pop -R -O -v \"{0}{1}\" -L . -t {2} .", depotName, (string.IsNullOrEmpty(streamName) ? "" : "_" + streamName), transactionId), workingDir);
 			execGitRaw("add --all", workingDir);
 			execGitCommit(string.Format("commit --date={0} --author={1} --file=\"{2}\"", unixDate, gitUser, commentFilePath), workingDir, unixDate.ToString(), gitUser);
+			execGitRaw(string.Format("config accurev2git.lasttran {0}", transactionId), workingDir);
 		}
 
 		static GitUser translateUser(string accurevUser)
@@ -191,7 +234,7 @@ namespace AccuRev2Git
 			return result;
 		}
 
-		static void execGitRaw(string arguments, string workingDir, bool ignoreErrors = false)
+		static string execGitRaw(string arguments, string workingDir, bool ignoreErrors = false)
 		{
 			var gitPath = ConfigurationManager.AppSettings["GitPath"];
 			var process = new Process
@@ -205,12 +248,13 @@ namespace AccuRev2Git
 			process.StartInfo.RedirectStandardError = true;
 			process.StartInfo.RedirectStandardOutput = true;
 			process.Start();
-			process.StandardOutput.ReadToEnd();
+			var output = process.StandardOutput.ReadToEnd();
 			if (!ignoreErrors && process.StandardError.EndOfStream == false)
 			{
 				var errors = process.StandardError.ReadToEnd();
 				throw new ApplicationException(string.Format("Git has returned an error: {0}", errors));
 			}
+			return output;
 		}
 
 		static void execGitCommit(string arguments, string workingDir, string commitDate, GitUser gitUser)
