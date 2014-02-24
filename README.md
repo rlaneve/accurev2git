@@ -23,7 +23,7 @@ accurev2git.exe -d acdepot -s acstream -w . -r true -u acuser -p acpass
 ---
 ---
 
-Copyright (c) 2012 Ryan LaNeve
+Copyright (c) 2014 Ryan LaNeve
 
 Permission is hereby granted, free of charge, to any person
 obtaining a copy of this software and associated documentation
