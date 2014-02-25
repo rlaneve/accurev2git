@@ -211,10 +211,36 @@ namespace AccuRev2Git
 			return _gitUsers.SingleOrDefault(u => u.AccuRevUserName.Equals(accurevUser, StringComparison.OrdinalIgnoreCase));
 		}
 
+		/// <summary>
+		/// Depth-first recursive delete, with handling for descendant 
+		/// directories open in Windows Explorer.
+		/// See http://stackoverflow.com/a/1703799/264822
+		/// </summary>
+		public static void deleteDirectory(string path)
+		{
+			foreach (string directory in Directory.GetDirectories(path))
+			{
+				deleteDirectory(directory);
+			}
+
+			try
+			{
+				Directory.Delete(path, true);
+			}
+			catch (IOException)
+			{
+				Directory.Delete(path, true);
+			}
+			catch (UnauthorizedAccessException)
+			{
+				Directory.Delete(path, true);
+			}
+		}
+
 		static void execClean(string workingDir)
 		{
 			foreach (var dir in Directory.GetDirectories(workingDir).Where(dir => !dir.EndsWith(".git")))
-				Directory.Delete(dir, true);
+				deleteDirectory(dir);
 			foreach (var file in Directory.GetFiles(workingDir).Where(file => !file.EndsWith(".gitignore")))
 				File.Delete(file);
 		}
