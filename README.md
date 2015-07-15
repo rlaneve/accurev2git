@@ -2,6 +2,9 @@
 
 AccuRev2Git is a tool to convert an AccuRev depot into a git repo. A specified AccuRev stream will be the target of the conversion, and all promotes to that stream will be turned into commits within the new git repository.
 
+### NOTICE ###
+Lazar Sumar has an alternate implementation available [here](https://github.com/orao/ac2git) which takes advantage of functionality found in later AccuRev clients than from when I wrote this converter. It is being worked on and improved, whereas mine is not. Mine served its purpose, and I have no intention of working on it again.
+
 ### Getting Started ###
 - Update the users.txt file.
 
